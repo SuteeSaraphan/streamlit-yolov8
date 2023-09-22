@@ -32,22 +32,13 @@ def _display_detected_frames(conf, model, st_frame, image, is_display_tracking=N
         # Predict the objects in the image using the YOLOv8 model
         res = model.predict(image, conf=conf)
 
-    # Count the number of detected objects
-    object_count = len(res[0])
-
-    # Display the object count on the same location
-    object_count_text = f'Number of Objects Detected: {object_count}'
-    st_frame.markdown(object_count_text, unsafe_allow_html=True)
-
-    # Plot the detected objects on the video frame
+    # # Plot the detected objects on the video frame
     res_plotted = res[0].plot()
     st_frame.image(res_plotted,
                    caption='Detected Video',
                    channels="BGR",
                    use_column_width=True
                    )
-
-
 
 
 def play_youtube_video(conf, model):
