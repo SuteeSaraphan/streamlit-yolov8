@@ -132,7 +132,7 @@ def play_webcam(conf, model):
             st.sidebar.error("Error loading video: " + str(e))
 
 
-def play_stored_video(conf,model,list_polygon,scaler):
+def play_stored_video(conf,model):
     '''
         conf: confidence threshold
         scaler: scale image from polygon to scale back normal image
@@ -157,7 +157,9 @@ def play_stored_video(conf,model,list_polygon,scaler):
             st_frame = st.empty()
             #get video info
             h,w = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-            count = CountObject(model,h,w,list_polygon,conf,scaler)
+
+            
+            count = CountObject(conf,model,h,w,list_polygon=settings.MOCK_LIST_POLYGON)
 
             text=st.empty()
             while (vid_cap.isOpened()):
