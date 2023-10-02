@@ -3,12 +3,15 @@ import time
 import streamlit as st
 import cv2
 from pytube import YouTube
-
+from count_obj import CountObject
 import settings
-
+import torch
 
 def load_model(model_path):
+    device: str = "cuda" if torch.cuda.is_available() else "cpu"
     model = YOLO(model_path)
+    model.to(device)
+    print(device)
     return model
 
 
@@ -40,6 +43,12 @@ def _display_detected_frames(conf, model, st_frame, image, is_display_tracking=N
                    use_column_width=True
                    )
 
+def display_count(st_frame, image):
+    st_frame.image(image,
+                   caption='Detected Video',
+                   channels="BGR",
+                   use_column_width=True
+                   )
 
 def play_youtube_video(conf, model):
     source_youtube = st.sidebar.text_input("YouTube Video url")
@@ -139,16 +148,32 @@ def play_stored_video(conf, model):
             vid_cap = cv2.VideoCapture(
                 str(settings.VIDEOS_DICT.get(source_vid)))
             st_frame = st.empty()
+            #get video info
+            h,w = vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT), vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+            h,w = int(h),int(w)
+            print(h,w)
+            list1=[[100,300],[100,100],[1000,100],[1000,300]]
+            list2=[[300,900],[300,300],[1000,300],[1000,900]]
+            list = [list1,list2]
+            count = CountObject(model,h,w,list)
+            
+            #stop button in sidebat to break loop
+            # if st.sidebar.button('Stop'):
+            #     print("stop")
+            text=st.empty()
             while (vid_cap.isOpened()):
                 success, image = vid_cap.read()
                 if success:
-                    _display_detected_frames(conf,
-                                             model,
-                                             st_frame,
-                                             image,
-                                             is_display_tracker,
-                                             tracker
-                                             )
+                    img_processed,json = count.process_frame(image, 0)
+                    # _display_detected_frames(conf,
+                    #                          model,
+                    #                          st_frame,
+                    #                          image,
+                    #                          is_display_tracker,
+                    #                          tracker
+                    #                          )
+                    display_count(st_frame,img_processed)
+                    text.json(json)
                 else:
                     vid_cap.release()
                     break
