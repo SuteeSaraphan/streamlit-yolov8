@@ -6,6 +6,65 @@ from pytube import YouTube
 from count_obj import CountObject
 import settings
 import torch
+import pandas as pd
+import PIL
+import math
+import settings
+from streamlit_drawable_canvas import st_canvas
+
+
+
+
+
+
+def polygon_draw(image, width = None, height = None , source = None):
+    if source == "image":
+        test2 = {}
+        print(type(image))
+        print(test2)
+        scale_x = image.size[0] / 400
+        scale_y = image.size[1] / 400
+        bg_img = image
+    elif source == "video":
+        test2 = {}
+        if st.button("Next Frame"):
+            st.session_state['current_frame'] += 1
+        image.set(cv2.CAP_PROP_POS_FRAMES, st.session_state['current_frame'])
+        ret , frame = image.read()
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = PIL.Image.fromarray(frame)
+        bg_img = frame
+        scale_x = frame.size[0] / 400
+        scale_y = frame.size[1] / 400
+    st.write("Draw a polygon on the image below:")
+    print(scale_x, scale_y)
+    canvas_result = st_canvas(
+                fill_color='rgba(255, 165, 0, 0.3)',  # Fixed fill color with some opacity
+                stroke_width=1,
+                stroke_color='#ffffff',
+                background_image=bg_img,
+                height=400,
+                width=400,
+                drawing_mode='polygon',
+                key='canvas',
+                display_toolbar=True,
+                update_streamlit=True,
+            )
+    if canvas_result.image_data is not None:
+            df = pd.json_normalize(canvas_result.json_data["objects"])
+            if (len(df) != 0):
+                new_df = []
+                df = df[['path']]
+                test1234 = df['path'][0]
+                for i in range(0, len(df['path'])):
+                    new_df = []
+                    for x in range(0, len(df['path'][i])):
+                        if x != len(df['path'][i]) - 1:
+                            df['path'][i][x][1] = math.ceil(df['path'][i][x][1] * scale_x)
+                            df['path'][i][x][2] = math.ceil(df['path'][i][x][2] * scale_y)
+                        new_df.append(df['path'][i][x])
+                    test2[i] = new_df
+                    print(test2)
 
 def load_model(model_path):
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
@@ -60,6 +119,7 @@ def play_youtube_video(conf, model):
             yt = YouTube(source_youtube)
             stream = yt.streams.filter(file_extension="mp4", res=720).first()
             vid_cap = cv2.VideoCapture(stream.url)
+            polygon_draw(vid_cap, source = "video")
 
             st_frame = st.empty()
             while (vid_cap.isOpened()):
@@ -143,13 +203,16 @@ def play_stored_video(conf,model,list_polygon,scaler):
     source_vid = st.sidebar.selectbox(
         "Choose a video...", settings.VIDEOS_DICT.keys())
 
+    if source_vid is not None:
+        vid_cap = cv2.VideoCapture(str(settings.VIDEOS_DICT.get(source_vid)))
+        polygon_draw(vid_cap, source = "video")
     is_display_tracker, tracker = display_tracker_options()
 
     with open(settings.VIDEOS_DICT.get(source_vid), 'rb') as video_file:
         video_bytes = video_file.read()
     if video_bytes:
         st.video(video_bytes)
-
+ 
     if st.sidebar.button('Detect Video Objects'):
         try:
             vid_cap = cv2.VideoCapture(
