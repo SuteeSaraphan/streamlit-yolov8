@@ -132,7 +132,14 @@ def play_webcam(conf, model):
             st.sidebar.error("Error loading video: " + str(e))
 
 
-def play_stored_video(conf, model):
+def play_stored_video(conf,model,list_polygon,scaler):
+    '''
+        conf: confidence threshold
+        scaler: scale image from polygon to scale back normal image
+        list_polygon: list of polygon
+        example: list_polygon = [[[100,300],[100,100],[1000,100],[1000,300]],[[300,900],[300,300],[1000,300],[1000,900]]]
+    
+    '''    
     source_vid = st.sidebar.selectbox(
         "Choose a video...", settings.VIDEOS_DICT.keys())
 
@@ -149,17 +156,9 @@ def play_stored_video(conf, model):
                 str(settings.VIDEOS_DICT.get(source_vid)))
             st_frame = st.empty()
             #get video info
-            h,w = vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT), vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-            h,w = int(h),int(w)
-            print(h,w)
-            list1=[[100,300],[100,100],[1000,100],[1000,300]]
-            list2=[[300,900],[300,300],[1000,300],[1000,900]]
-            list = [list1,list2]
-            count = CountObject(model,h,w,list)
-            
-            #stop button in sidebat to break loop
-            # if st.sidebar.button('Stop'):
-            #     print("stop")
+            h,w = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            count = CountObject(model,h,w,list_polygon,conf,scaler)
+
             text=st.empty()
             while (vid_cap.isOpened()):
                 success, image = vid_cap.read()

@@ -48,3 +48,10 @@ SEGMENTATION_MODEL = MODEL_DIR / 'yolov8n-seg.pt'
 
 # Webcam
 WEBCAM_PATH = 0
+
+#Polygon TEST
+
+MOCK_LIST_POLYGON = [[[100,300],[100,100],[1000,100],[1000,300]],[[300,900],[300,300],[1000,300],[1000,900]]]
+
+#Scale
+SCALER = 1.0
