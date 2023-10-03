@@ -108,13 +108,13 @@ elif source_radio == settings.VIDEO:
     
 
 elif source_radio == settings.WEBCAM:
-    helper.play_webcam(confidence, model,list_polygon=settings.MOCK_LIST_POLYGON,scaler=settings.SCALER)
+    helper.play_webcam(confidence, model)#,list_polygon=settings.MOCK_LIST_POLYGON,scaler=settings.SCALER
 
 elif source_radio == settings.RTSP:
-    helper.play_rtsp_stream(confidence, model,list_polygon=settings.MOCK_LIST_POLYGON,scaler=settings.SCALER)
+    helper.play_rtsp_stream(confidence, model)#list_polygon=settings.MOCK_LIST_POLYGON,scaler=settings.SCALER
 
 elif source_radio == settings.YOUTUBE:
-    helper.play_youtube_video(confidence, model,list_polygon=settings.MOCK_LIST_POLYGON,scaler=settings.SCALER)
+    helper.play_youtube_video(confidence, model)#list_polygon=settings.MOCK_LIST_POLYGON,scaler=settings.SCALER
 
 else:
     st.error("Please select a valid source type!")
