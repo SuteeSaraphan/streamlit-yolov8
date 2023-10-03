@@ -6,6 +6,62 @@ from pytube import YouTube
 from count_obj import CountObject
 import settings
 import torch
+import pandas as pd
+import PIL
+import math
+import settings
+from streamlit_drawable_canvas import st_canvas
+
+
+
+
+
+
+def polygon_draw(image, width = None, height = None , source = None):
+    if source == "image":
+        result_polygon = []
+        scale_x = image.size[0] / 400
+        scale_y = image.size[1] / 400
+        bg_img = image
+    elif source == "video":
+        result_polygon = []
+        if st.button("Next Frame"):
+            st.session_state['current_frame'] += 30
+        image.set(cv2.CAP_PROP_POS_FRAMES, st.session_state['current_frame'])
+        ret , frame = image.read()
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = PIL.Image.fromarray(frame)
+        bg_img = frame
+        scale_x = frame.size[0] / 400
+        scale_y = frame.size[1] / 400
+
+    st.write("Draw a polygon on the image below:")
+    canvas_result = st_canvas(
+                fill_color='rgba(255, 165, 0, 0.3)',  # Fixed fill color with some opacity
+                stroke_width=1,
+                stroke_color='#ffffff',
+                background_image=bg_img,
+                height=400,
+                width=400,
+                drawing_mode='polygon',
+                key='canvas',
+                display_toolbar=True,
+                update_streamlit=True,
+            )
+    if canvas_result.image_data is not None:
+            df = pd.json_normalize(canvas_result.json_data["objects"])
+            if (len(df) != 0):
+                new_df = []
+                df = df[['path']]
+                for i in range(0, len(df['path'])):
+                    new_df = []
+                    for x in range(0, len(df['path'][i])):
+                        if x != len(df['path'][i]) - 1:
+                            df['path'][i][x][1] = math.ceil(df['path'][i][x][1] * scale_x)
+                            df['path'][i][x][2] = math.ceil(df['path'][i][x][2] * scale_y)
+                        new_df.append(df['path'][i][x])
+                    result_polygon.append(new_df)
+                    print(result_polygon)
 
 def load_model(model_path):
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
@@ -52,15 +108,19 @@ def display_count(st_frame, image):
 
 def play_youtube_video(conf, model):
     source_youtube = st.sidebar.text_input("YouTube Video url")
-
+    print(source_youtube)
     is_display_tracker, tracker = display_tracker_options()
-
-    if st.sidebar.button('Detect Objects'):
+    if source_youtube != "":
         try:
             yt = YouTube(source_youtube)
             stream = yt.streams.filter(file_extension="mp4", res=720).first()
             vid_cap = cv2.VideoCapture(stream.url)
-
+            polygon_draw(vid_cap, source = "video")
+        except Exception as e:
+            st.sidebar.error("Error loading video: " + str(e))
+       
+    if st.sidebar.button('Detect Objects'):
+        try:
             st_frame = st.empty()
             while (vid_cap.isOpened()):
                 success, image = vid_cap.read()
@@ -83,6 +143,13 @@ def play_rtsp_stream(conf, model):
     source_rtsp = st.sidebar.text_input("rtsp stream url:")
     st.sidebar.caption('Example URL: rtsp://admin:12345@192.168.1.210:554/Streaming/Channels/101')
     is_display_tracker, tracker = display_tracker_options()
+    if source_rtsp != "":
+        try:
+            vid_cap = cv2.VideoCapture(source_rtsp)
+            polygon_draw(vid_cap, source = "video")
+        except Exception as e:
+            st.sidebar.error("Error loading video: " + str(e))
+       
     if st.sidebar.button('Detect Objects'):
         try:
             vid_cap = cv2.VideoCapture(source_rtsp)
@@ -111,6 +178,17 @@ def play_rtsp_stream(conf, model):
 def play_webcam(conf, model):
     source_webcam = settings.WEBCAM_PATH
     is_display_tracker, tracker = display_tracker_options()
+    capture = True
+    vid_cap = cv2.VideoCapture(source_webcam)
+    if st.button("capture"):
+        capture = False
+    if (vid_cap.isOpened()):
+        ret , frame = vid_cap.read()
+            
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame = PIL.Image.fromarray(frame)
+    polygon_draw(frame, source = "image")
+   
     if st.sidebar.button('Detect Objects'):
         try:
             vid_cap = cv2.VideoCapture(source_webcam)
@@ -143,13 +221,16 @@ def play_stored_video(conf,model):
     source_vid = st.sidebar.selectbox(
         "Choose a video...", settings.VIDEOS_DICT.keys())
 
+    if source_vid is not None:
+        vid_cap = cv2.VideoCapture(str(settings.VIDEOS_DICT.get(source_vid)))
+        polygon_draw(vid_cap, source = "video")
     is_display_tracker, tracker = display_tracker_options()
 
     with open(settings.VIDEOS_DICT.get(source_vid), 'rb') as video_file:
         video_bytes = video_file.read()
     if video_bytes:
         st.video(video_bytes)
-
+ 
     if st.sidebar.button('Detect Video Objects'):
         try:
             vid_cap = cv2.VideoCapture(
