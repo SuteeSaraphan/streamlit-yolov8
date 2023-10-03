@@ -73,10 +73,12 @@ def load_model(model_path):
 
 
 def display_tracker_options():
-    display_tracker = st.radio("Display Tracker", ('Yes', 'No'))
+    #display_tracker = st.radio("Display Tracker", ('Yes', 'No'))
+    display_tracker = 'Yes'
     is_display_tracker = True if display_tracker == 'Yes' else False
     if is_display_tracker:
-        tracker_type = st.radio("Tracker", ("bytetrack.yaml", "botsort.yaml"))
+        #tracker_type = st.radio("Tracker", ("bytetrack.yaml", "botsort.yaml"))
+        tracker_type = "bytetrack.yaml"
         return is_display_tracker, tracker_type
     return is_display_tracker, None
 
