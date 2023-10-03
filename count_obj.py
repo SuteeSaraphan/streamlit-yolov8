@@ -4,11 +4,12 @@ import numpy as np
 import supervision as sv
 import json
 class CountObject():
-    def __init__(self,model,h,w,list,confident=0.1,scale=1)-> None:
+    def __init__(self,confident,model,h,w,list_polygon)-> None:
         self.model = model
         self.colors = sv.ColorPalette.default()
         self.confident = confident
-        self.polygons = [(np.array(poly)*scale).astype(np.int32) for poly in list]
+        self.polygons = [np.array([index[1:] for index in l][:-1]).astype(np.int32) for l in list_polygon]
+        print(self.polygons)
         
         self.img_height = h
         self.img_width = w
