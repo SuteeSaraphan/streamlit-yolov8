@@ -86,3 +86,4 @@ validators==0.22.0
 watchdog==3.0.0
 zipp==3.16.2
 supervision==0.14.0
+streamlit_drawable_canvas
