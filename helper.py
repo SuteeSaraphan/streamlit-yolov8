@@ -14,7 +14,7 @@ from streamlit_drawable_canvas import st_canvas
 
 
 
-
+result_polygon = []
 
 
 def polygon_draw(image, width = None, height = None , source = None):
@@ -62,6 +62,7 @@ def polygon_draw(image, width = None, height = None , source = None):
                         new_df.append(df['path'][i][x])
                     result_polygon.append(new_df)
                     print(result_polygon)
+    return result_polygon
 
 def load_model(model_path):
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
@@ -223,7 +224,7 @@ def play_stored_video(conf,model):
 
     if source_vid is not None:
         vid_cap = cv2.VideoCapture(str(settings.VIDEOS_DICT.get(source_vid)))
-        polygon_draw(vid_cap, source = "video")
+        list_polygon = polygon_draw(vid_cap, source = "video")
     is_display_tracker, tracker = display_tracker_options()
 
     with open(settings.VIDEOS_DICT.get(source_vid), 'rb') as video_file:
@@ -240,7 +241,7 @@ def play_stored_video(conf,model):
             h,w = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 
             
-            count = CountObject(conf,model,h,w,list_polygon=settings.MOCK_LIST_POLYGON)
+            count = CountObject(conf,model,h,w,list_polygon)
 
             text=st.empty()
             while (vid_cap.isOpened()):
