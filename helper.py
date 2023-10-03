@@ -249,29 +249,29 @@ def play_stored_video(conf,model):
         except Exception as e:
             st.sidebar.error("Error loading video: " + str(e))
 
-def detect(source,list_polygon,conf,model):
+def detect(source, list_polygon, conf, model):
     vid_cap = cv2.VideoCapture(source)
     st_frame = st.empty()
-    #get video info
-    h,w = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-
     
-    count = CountObject(conf,model,h,w,list_polygon)
-
-    text=st.empty()
-    while (vid_cap.isOpened()):
+    # Get video info
+    h, w = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    
+    count = CountObject(conf, model, h, w, list_polygon)
+    text = st.empty()
+    
+    frame_counter = 0
+    
+    while vid_cap.isOpened():
         success, image = vid_cap.read()
+        frame_counter += 1
+        
         if success:
-            img_processed,json = count.process_frame(image, 0)
-            # _display_detected_frames(conf,
-            #                          model,
-            #                          st_frame,
-            #                          image,
-            #                          is_display_tracker,
-            #                          tracker
-            #                          )
-            display_count(st_frame,img_processed)
-            text.json(json)
+            if frame_counter % 25 == 0:
+                img_processed, json = count.process_frame(image, 0)
+                display_count(st_frame, img_processed)
+                text.json(json)
+                frame_counter = 0
+    
         else:
             vid_cap.release()
             break

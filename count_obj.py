@@ -3,6 +3,7 @@
 import numpy as np
 import supervision as sv
 import json
+import settings
 class CountObject():
     def __init__(self,confident,model,h,w,list_polygon)-> None:
         self.model = model
@@ -48,7 +49,7 @@ class CountObject():
         results = self.model(frame, imgsz=self.img_width)[0]
 
         detections = sv.Detections.from_ultralytics(results)
-        detections = detections[(detections.class_id == 2) & (detections.confidence > self.confident)]
+        detections = detections[(detections.class_id in settings.CLASS_SELECT) & (detections.confidence > self.confident)]
 
         for index, (zone, zone_annotator, box_annotator) in enumerate(zip(self.zones, self.zone_annotators, self.box_annotators)):
             mask = zone.trigger(detections=detections)
