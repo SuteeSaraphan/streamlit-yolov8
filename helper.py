@@ -35,7 +35,7 @@ def polygon_draw(image, width = None, height = None , source = None):
         scale_x = frame.size[0] / 400
         scale_y = frame.size[1] / 400
 
-    st.write("Draw a polygon on the image below:")
+    st.write("Draw a polygon on the image below (Left Click: To Draw a polygon, Right Click: To Enter Polygon):")
     canvas_result = st_canvas(
                 fill_color='rgba(255, 165, 0, 0.3)',  # Fixed fill color with some opacity
                 stroke_width=1,
