@@ -16,7 +16,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
 # Main page heading
 st.title("Detection Car Lens Zone")
 
@@ -31,9 +30,21 @@ model_type = st.sidebar.radio(
 confidence = float(st.sidebar.slider(
     "Select Model Confidence", 25, 100, 40)) / 100
 
-
+#session state for youtube video
+if "source_temp" not in st.session_state:
+    st.session_state['source_temp'] = ""
+if "frame" not in st.session_state:
+    st.session_state['frame'] = ""
+if "current_frame_youtube" not in st.session_state:
+    st.session_state['current_frame_youtube'] = 0
+# session state for polygon drawing
 if 'current_frame' not in st.session_state:
     st.session_state['current_frame'] = 1
+if 'sum_frame' not in st.session_state:
+    st.session_state['sum_frame'] = 0
+#session for check already capture image
+if 'already_capture' not in st.session_state:
+    st.session_state['already_capture'] = False
 
 # Selecting Detection Or Segmentation
 if model_type == 'Detection':
