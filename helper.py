@@ -266,18 +266,14 @@ def detect(source, list_polygon, conf, model):
     count = CountObject(conf, model, h, w, list_polygon)
     text = st.empty()
     
-    frame_counter = 0
     
     while vid_cap.isOpened():
         success, image = vid_cap.read()
-        frame_counter += 1
         
         if success:
-            if frame_counter % 25 == 0:
                 img_processed, json = count.process_frame(image, 0)
                 display_count(st_frame, img_processed)
                 text.json(json)
-                frame_counter = 0
     
         else:
             vid_cap.release()
