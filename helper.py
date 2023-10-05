@@ -173,20 +173,7 @@ def play_youtube_video(conf, model):
             yt = YouTube(source_youtube)
             stream = yt.streams.filter(file_extension="mp4", res=720).first()
             detect(stream.url,result_polygon,conf,model)
-            # st_frame = st.empty()
-            # while (vid_cap.isOpened()):
-            #     success, image = vid_cap.read()
-            #     if success:
-            #         _display_detected_frames(conf,
-            #                                  model,
-            #                                  st_frame,
-            #                                  image,
-            #                                  is_display_tracker,
-            #                                  tracker,
-            #                                  )
-            #     else:
-            #         vid_cap.release()
-            #         break
+
         except Exception as e:
             st.sidebar.error("Error loading video: " + str(e))
 
@@ -236,21 +223,7 @@ def play_webcam(conf, model):
     if st.sidebar.button('Detect Objects'):
         try:
             detect(source_webcam,result_polygon,conf,model)
-            # vid_cap = cv2.VideoCapture(source_webcam)
-            # st_frame = st.empty()
-            # while (vid_cap.isOpened()):
-            #     success, image = vid_cap.read()
-            #     if success:
-            #         _display_detected_frames(conf,
-            #                                  model,
-            #                                  st_frame,
-            #                                  image,
-            #                                  is_display_tracker,
-            #                                  tracker,
-            #                                  )
-            #     else:
-            #         vid_cap.release()
-            #         break
+
         except Exception as e:
             st.sidebar.error("Error loading video: " + str(e))
 
@@ -279,32 +252,7 @@ def play_stored_video(conf,model):
     if st.sidebar.button('Detect Video Objects'):
         try:
             detect(str(settings.VIDEOS_DICT.get(source_vid)),result_polygon,conf,model)
-            # vid_cap = cv2.VideoCapture(
-            #     str(settings.VIDEOS_DICT.get(source_vid)))
-            # st_frame = st.empty()
-            # #get video info
-            # h,w = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
 
-            
-            # count = CountObject(conf,model,h,w,list_polygon)
-
-            # text=st.empty()
-            # while (vid_cap.isOpened()):
-            #     success, image = vid_cap.read()
-            #     if success:
-            #         img_processed,json = count.process_frame(image, 0)
-            #         # _display_detected_frames(conf,
-            #         #                          model,
-            #         #                          st_frame,
-            #         #                          image,
-            #         #                          is_display_tracker,
-            #         #                          tracker
-            #         #                          )
-            #         display_count(st_frame,img_processed)
-            #         text.json(json)
-            #     else:
-            #         vid_cap.release()
-            #         break
         except Exception as e:
             st.sidebar.error("Error loading video: " + str(e))
 
