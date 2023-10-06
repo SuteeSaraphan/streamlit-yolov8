@@ -45,7 +45,12 @@ if 'sum_frame' not in st.session_state:
 #session for check already capture image
 if 'already_capture' not in st.session_state:
     st.session_state['already_capture'] = False
-
+if 'current_frame_rtsp' not in st.session_state:
+    st.session_state['current_frame_rtsp'] = 0
+if 'web_frame' not in st.session_state:
+    st.session_state['web_frame'] = 0
+if 'rtsp_frame' not in st.session_state:
+    st.session_state['rtsp_frame'] = 0
 # Selecting Detection Or Segmentation
 if model_type == 'Detection':
     model_path = Path(settings.DETECTION_MODEL)

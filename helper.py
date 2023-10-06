@@ -19,14 +19,13 @@ result_polygon = []
 
 def polygon_draw(image, width = None, height = None , source = None):
     result_polygon = []
-    if source == "image":
-        print(image)
+    if source == "image" and type(image) == PIL.Image.Image:
         scale_x = image.size[0] / 400
         scale_y = image.size[1] / 400
         bg_img = image
     elif source == "video":
 
-        # check same video
+        # check frame video
         if st.session_state['sum_frame'] != image.get(cv2.CAP_PROP_FRAME_COUNT):
             st.session_state['sum_frame'] = image.get(cv2.CAP_PROP_FRAME_COUNT)
             st.session_state['current_frame'] = 0
@@ -43,6 +42,8 @@ def polygon_draw(image, width = None, height = None , source = None):
         bg_img = frame
         scale_x = frame.size[0] / 400
         scale_y = frame.size[1] / 400
+    else:
+        return
 
     st.write("Draw a polygon on the image below (Left Click: To Draw a polygon, Right Click: To Enter Polygon):")
     canvas_result = st_canvas(
@@ -66,14 +67,14 @@ def polygon_draw(image, width = None, height = None , source = None):
                 #tranform dataframe to list and scale back to normal image
                 for i in range(0, len(df['path'])):
                     new_df = []
-                    print(df['path'])
-                    print(len(df['path'][i]))
-                    print(df['path'][i])
-                    for x in range(0, len(df['path'][i])):
-                        if x != len(df['path'][i]) - 1:
-                            df['path'][i][x][1] = math.ceil(df['path'][i][x][1] * scale_x)
-                            df['path'][i][x][2] = math.ceil(df['path'][i][x][2] * scale_y)
-                        new_df.append(df['path'][i][x])
+                    if (type(df['path'][i]) == list):
+                        for x in range(0, len(df['path'][i])):
+                            if x != len(df['path'][i]) - 1:
+                                df['path'][i][x][1] = math.ceil(df['path'][i][x][1] * scale_x)
+                                df['path'][i][x][2] = math.ceil(df['path'][i][x][2] * scale_y)
+                            new_df.append(df['path'][i][x])
+                    else:
+                        break
                     result_polygon.append(new_df)
     return result_polygon
 
@@ -81,7 +82,6 @@ def load_model(model_path):
     device: str = "cuda" if torch.cuda.is_available() else "cpu"
     model = YOLO(model_path)
     model.to(device)
-    print(device)
     return model
 
 
@@ -123,18 +123,16 @@ def display_count(st_frame, image):
                    )
 
 def play_youtube_video(conf, model):
-
+    first_time = False
     #btn
-   
     #source video url
     source_youtube = st.sidebar.text_input("YouTube Video url")
     btn_load = st.sidebar.button("load video")
-    if st.session_state['source_temp'] != source_youtube:
-        st.session_state['current_frame_youtube'] = 0
-
-
     #check same video
-
+    if st.session_state['source_temp'] != source_youtube:
+        first_time = True
+        st.session_state['current_frame_youtube'] = 0
+        st.session_state['source_temp'] = source_youtube
         
     is_display_tracker, tracker = display_tracker_options()
     with st.container():
@@ -146,27 +144,29 @@ def play_youtube_video(conf, model):
             st.session_state['current_frame_youtube'] = 0
             st.session_state['frame'] = 0
             source_youtube = ""
-    if source_youtube != "" and source_youtube != st.session_state['source_temp'] and btn_load or btn_next:
+    if source_youtube != "" and first_time  or btn_load or btn_next:
         try:
             yt = YouTube(source_youtube)
             stream = yt.streams.filter(file_extension="mp4", res=720).first()
             vid_cap = cv2.VideoCapture(stream.url)
-            vid_cap.set(cv2.CAP_PROP_POS_FRAMES, st.session_state['current_frame_youtube'])
+            if st.session_state['current_frame_youtube'] < vid_cap.get(cv2.CAP_PROP_FRAME_COUNT):
+                vid_cap.set(cv2.CAP_PROP_POS_FRAMES, st.session_state['current_frame_youtube'])
+            else:
+                st.session_state['current_frame_youtube'] = 0
+                vid_cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
             ret , frame = vid_cap.read()
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = PIL.Image.fromarray(frame)
             st.session_state['frame'] = frame
         except Exception as e:
             st.sidebar.error("Error loading video: " + str(e))
-    if source_youtube != "" and source_youtube != st.session_state['source_temp']:
+
+    if source_youtube != "" :
         try:
             result_polygon=polygon_draw(st.session_state['frame'], source = "image")
-        except Exception as e:
-            if e == "object of type 'float' has no len()":
-                pass
-            else:
-                st.write("Error to draw polygon try again")
 
+        except Exception as e:
+            st.write(e)
        
     if st.sidebar.button('Detect Objects'):
         try:
@@ -180,44 +180,56 @@ def play_youtube_video(conf, model):
 
 def play_rtsp_stream(conf, model):
     source_rtsp = st.sidebar.text_input("rtsp stream url:")
-    st.sidebar.caption('Example URL: rtsp://admin:12345@192.168.1.210:554/Streaming/Channels/101')
+    st.sidebar.caption('Example URL: rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4')
     is_display_tracker, tracker = display_tracker_options()
+    if st.button("Capture"):
+        st.session_state['already_capture']= False
+    if (st.session_state['already_capture'] == False and source_rtsp != ""):
+        st.session_state['rtsp_frame'] = 0
+        vid_cap = cv2.VideoCapture(source_rtsp)
+        if vid_cap.isOpened():
+            ret , frame = vid_cap.read()        
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        frame = PIL.Image.fromarray(frame)
+        st.session_state['rtsp_frame'] = frame
+        st.session_state['already_capture']= True
     if source_rtsp != "":
         try:
-            vid_cap = cv2.VideoCapture(source_rtsp)
-            result_polygon=polygon_draw(vid_cap, source = "video")
+            result_polygon=polygon_draw(st.session_state['rtsp_frame'], source = "image")
         except Exception as e:
-            st.sidebar.error("Error loading video: " + str(e))
-       
-    if st.sidebar.button('Detect Objects'):
+            if e == "object of type 'float' has no len()":
+                pass
+
+    if st.sidebar.button('Detect Objects') and source_rtsp != "":
         try:
             detect(source_rtsp,result_polygon,conf,model)
         except Exception as e:
-            vid_cap.release()
             st.sidebar.error("Error loading RTSP stream: " + str(e))
 
 
 def play_webcam(conf, model):
     source_webcam = settings.WEBCAM_PATH
     is_display_tracker, tracker = display_tracker_options()
-   
+    
     if st.button("Cupture again"):
         st.session_state['already_capture']= False
     if (st.session_state['already_capture'] == False):
+        print("capture")
         vid_cap = cv2.VideoCapture(source_webcam)
         if vid_cap.isOpened():
             ret , frame = vid_cap.read()        
         frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         frame = PIL.Image.fromarray(frame)
-        st.session_state['frame'] = frame
+        st.session_state['web_frame'] = frame
         st.session_state['already_capture']= True
-    try:
-        result_polygon=polygon_draw(st.session_state['frame'], source = "image")
-    except Exception as e:
-        if e == "object of type 'float' has no len()":
-            pass
-        else:
-            st.write("Error to draw polygon try again")
+    if st.session_state['already_capture'] == True:
+        try:
+            result_polygon=polygon_draw(st.session_state['web_frame'], source = "image")
+        except Exception as e:
+            if e == "object of type 'float' has no len()":
+                pass
+            else:
+                st.write("Error to draw polygon try again")
   
    
     if st.sidebar.button('Detect Objects'):
