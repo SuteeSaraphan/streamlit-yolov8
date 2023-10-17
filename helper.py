@@ -278,10 +278,8 @@ def play_stored_video(conf,model):
 
 def detect(source, list_polygon, conf, model):
     
-    # print(f"Interval {type(st.session_state['interval'])}")
     vid_cap = cv2.VideoCapture(source)
     st_frame = st.empty()
-    json_data = {}
     btn = st.button("stop")
     # Get video info
     h, w = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -290,9 +288,9 @@ def detect(source, list_polygon, conf, model):
     frames_processed = 0
     frames_to_skip = 0
     start_time = time.time()
+    lastest_time = time.time()
     count = CountObject(conf, model, h, w, list_polygon)
     json_display = st.empty()
-    start_time = time.time()
     jsons={}
     while vid_cap.isOpened():
         success, image = vid_cap.read()
@@ -320,26 +318,24 @@ def detect(source, list_polygon, conf, model):
             break
         # if somezone over max car
         if st.session_state['max_detect'] != 0:
-            for i in range(0, len(count.object_counts)):
-                if count.object_counts[i] > st.session_state['max_detect']:
-                    response = requests.post(st.session_state['url'], data = jsons , headers = {'Content-Type': 'application/json'})
-        #if interval time
-        elif st.session_state['interval'] != 0:
-            if time.time() - start_time > st.session_state['interval']:
-                # btn = True
-                start_time = time.time()
-                print(f"Interval {st.session_state['interval']}")
+            #send until over st.session_state['intervaldata']
+            if any (count.object_counts[key] > st.session_state['max_detect'] for key in count.object_counts):
                 response = requests.post(st.session_state['url'], data = jsons , headers = {'Content-Type': 'application/json'})
-        
+                lastest_time = time.time()
+            elif time.time() - lastest_time < st.session_state['intervaldata']:
+                response = requests.post(st.session_state['url'], data = jsons , headers = {'Content-Type': 'application/json'})
+
+
+        #if interval time
+        elif st.session_state['interval'] != 0 and time.time() - start_time > st.session_state['interval']:
+                start_time = time.time()
+                requests.post(st.session_state['url'], data = jsons , headers = {'Content-Type': 'application/json'})
+
 
 
         if btn:
             st.write("stop")
-            json_data = json.loads(jsons)
-            break
     if btn:
-        json_data = json.dumps(json_data)
-        print(jsons)
         response = requests.post(st.session_state['url'], data = jsons , headers = {'Content-Type': 'application/json'})
         print(response) 
         st.write(response.text)
@@ -347,6 +343,9 @@ def detect(source, list_polygon, conf, model):
 
 
 def interval_menu (typeCheck = None):
+    option = st.selectbox(
+    'Select mode',
+    ('interval', 'max_detect'))
     col1 , col2 , col3 = st.columns(3)
     if typeCheck == 'image':
         with col1:
@@ -356,9 +355,14 @@ def interval_menu (typeCheck = None):
         with col1:
             st.write("input url to send detect data object")
             st.session_state['url'] = st.text_input("url to send data:")
-        with col2:
-            st.write("interval time to detect object")
-            st.session_state['interval'] = st.number_input("interval time:", value = 0)
-        with col3:
-            st.write("max car to detect object")
-            st.session_state['max_detect'] = st.number_input("max car", value = 0)
+        if  option == 'interval':
+            with col2:
+                st.write("interval time to detect object")
+                st.session_state['interval'] = st.number_input("interval time:", value = 1)
+        if  option == 'max_detect':
+            with col2:
+                st.write("interval to hold data to send")
+                st.session_state['intervaldata'] = st.number_input("interval time:", value = 1)
+            with col3:
+                st.write("max car to detect object")
+                st.session_state['max_detect'] = st.number_input("max car", value = 0)

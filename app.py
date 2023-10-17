@@ -55,11 +55,13 @@ if 'rtsp_frame' not in st.session_state:
 if 'url' not in st.session_state:
     st.session_state['url'] = ""
 if 'interval' not in st.session_state:
-    st.session_state['interval'] = 0
+    st.session_state['interval'] = 1
 if 'mxa_detect' not in st.session_state:
     st.session_state['max_detect'] = 0
-
+if 'intervaldata' not in st.session_state:
+    st.session_state['intervaldata'] = 1
 # Selecting Detection Or Segmentation
+
 if model_type == 'Detection':
     model_path = Path(settings.DETECTION_MODEL)
 elif model_type == 'Segmentation':
