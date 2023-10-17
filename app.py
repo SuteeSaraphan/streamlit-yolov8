@@ -55,7 +55,7 @@ if 'rtsp_frame' not in st.session_state:
 if 'url' not in st.session_state:
     st.session_state['url'] = ""
 if 'interval' not in st.session_state:
-    st.session_state['interval'] = 1
+    st.session_state['interval'] = 0
 if 'mxa_detect' not in st.session_state:
     st.session_state['max_detect'] = 0
 

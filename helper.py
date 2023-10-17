@@ -16,6 +16,7 @@ from streamlit_drawable_canvas import st_canvas
 
 
 
+
 result_polygon = []
 
 
@@ -276,34 +277,63 @@ def play_stored_video(conf,model):
             st.sidebar.error("Error loading video: " + str(e))
 
 def detect(source, list_polygon, conf, model):
+    
+    # print(f"Interval {type(st.session_state['interval'])}")
     vid_cap = cv2.VideoCapture(source)
     st_frame = st.empty()
     json_data = {}
     btn = st.button("stop")
     # Get video info
     h, w = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-    
+    desired_frame_rate = vid_cap.get(cv2.CAP_PROP_FPS)
+    frame_time = 1.0 / desired_frame_rate
+    frames_processed = 0
+    frames_to_skip = 0
+    start_time = time.time()
     count = CountObject(conf, model, h, w, list_polygon)
-    text = st.empty()
-    
-    
+    json_display = st.empty()
+    start_time = time.time()
+    jsons={}
     while vid_cap.isOpened():
         success, image = vid_cap.read()
-        #update interval
-        #car condition zone 
-       
+
         if success:
-                img_processed, jsons = count.process_frame(image, 0)
-                display_count(st_frame, img_processed)
-                text.json(jsons)
+            # Process and display every nth frame, where n is frames_to_skip + 1
+            if frames_processed % (frames_to_skip + 1) == 0:
+                process_start_time = time.time()
                 
-                # test_json = json(json)
-                # print(test_json)
-                # print(type(test_json))
-                # text.json(json)
+                # Process and display the frame
+                img_processed = count.process_frame(image, 0)
+                display_count(st_frame, img_processed)
+                jsons = json.dumps(count.object_counts)
+                json_display.json(jsons)
+                
+                process_end_time = time.time()
+                processing_time = process_end_time - process_start_time
+                frames_to_skip = max(0, math.floor((processing_time - frame_time) / frame_time))
+                print(f"Processing time: {processing_time}, Frames to skip: {frames_to_skip}")
+                frames_processed = 0
+
+            frames_processed += 1
         else:
             vid_cap.release()
             break
+
+        #if somezone over max car
+        if st.session_state['max_detect'] != 0:
+            for i in range(0, len(count.object_counts)):
+                if count.object_counts[i] > st.session_state['max_detect']:
+                    btn = True
+                    break
+        #if interval time
+        if st.session_state['interval'] != 0:
+            if time.time() - start_time > st.session_state['interval']:
+                # btn = True
+                start_time = time.time()
+                print(f"Interval {st.session_state['interval']}")
+        
+
+
         if btn:
             st.write("stop")
             json_data = json.loads(jsons)
@@ -328,7 +358,7 @@ def interval_menu (typeCheck = None):
             st.session_state['url'] = st.text_input("url to send data:")
         with col2:
             st.write("interval time to detect object")
-            st.session_state['interval'] = st.text_input("interval time:", value = 0)
+            st.session_state['interval'] = st.number_input("interval time:", value = 0)
         with col3:
             st.write("max car to detect object")
-            st.session_state['max_detect'] = st.text_input("max car", value = 0)
+            st.session_state['max_detect'] = st.number_input("max car", value = 0)

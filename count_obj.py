@@ -4,6 +4,7 @@ import numpy as np
 import supervision as sv
 import json
 import settings
+import streamlit as st
 class CountObject():
     def __init__(self,confident,model,h,w,list_polygon)-> None:
         self.model = model
@@ -44,13 +45,11 @@ class CountObject():
         
 
     def process_frame(self, frame: np.ndarray, i) -> np.ndarray:
-        dict_data={}
+        # dict_data={}
         # detect
         results = self.model(frame, imgsz=self.img_width)[0]
-
         detections = sv.Detections.from_ultralytics(results)
         detections = detections[np.isin(detections.class_id, [2, 5, 7]) & (detections.confidence > self.confident)]
-
 
 
         for index, (zone, zone_annotator, box_annotator) in enumerate(zip(self.zones, self.zone_annotators, self.box_annotators)):
@@ -69,17 +68,17 @@ class CountObject():
             frame = zone_annotator.annotate(scene=frame)
 
           # Print object counts for each zone
-        for index, count in self.object_counts.items():
-            print(f'Zone{index + 1}: {count}')
-            #create json file
-            data = {}
-            data[f'zone{index + 1}'] = count
-            dict_data.update(data)
+        # for index, count in self.object_counts.items():
+        #     print(f'Zone{index + 1}: {count}')
+        #     #create json file
+        #     data = {}
+        #     data[f'zone{index + 1}'] = count
+        #     dict_data.update(data)
 
-        #Change dict_data to json file
-        json_data = json.dumps(dict_data, indent=4)
+        # #Change dict_data to json file
+        # json_data = json.dumps(dict_data, indent=4)
         
 
-        return frame,json_data
+        return frame
     
         
