@@ -9,6 +9,8 @@ import torch
 import pandas as pd
 import PIL
 import math
+import json
+import requests
 import settings
 from streamlit_drawable_canvas import st_canvas
 
@@ -19,7 +21,8 @@ result_polygon = []
 
 def polygon_draw(image, width = None, height = None , source = None):
     result_polygon = []
-    if source == "image" and type(image) == PIL.Image.Image:
+   
+    if source == "image":
         scale_x = image.size[0] / 400
         scale_y = image.size[1] / 400
         bg_img = image
@@ -128,6 +131,7 @@ def play_youtube_video(conf, model):
     #source video url
     source_youtube = st.sidebar.text_input("YouTube Video url")
     btn_load = st.sidebar.button("load video")
+    interval_menu()
     #check same video
     if st.session_state['source_temp'] != source_youtube:
         first_time = True
@@ -182,6 +186,7 @@ def play_rtsp_stream(conf, model):
     source_rtsp = st.sidebar.text_input("rtsp stream url:")
     st.sidebar.caption('Example URL: rtsp://wowzaec2demo.streamlock.net/vod/mp4:BigBuckBunny_115k.mp4')
     is_display_tracker, tracker = display_tracker_options()
+    interval_menu()
     if st.button("Capture"):
         st.session_state['already_capture']= False
     if (st.session_state['already_capture'] == False and source_rtsp != ""):
@@ -210,7 +215,7 @@ def play_rtsp_stream(conf, model):
 def play_webcam(conf, model):
     source_webcam = settings.WEBCAM_PATH
     is_display_tracker, tracker = display_tracker_options()
-    
+    interval_menu()
     if st.button("Cupture again"):
         st.session_state['already_capture']= False
     if (st.session_state['already_capture'] == False):
@@ -247,7 +252,9 @@ def play_stored_video(conf,model):
         list_polygon: list of polygon
         example: list_polygon = [[[100,300],[100,100],[1000,100],[1000,300]],[[300,900],[300,300],[1000,300],[1000,900]]]
     
-    '''    
+    '''
+    interval_menu()
+
     source_vid = st.sidebar.selectbox(
         "Choose a video...", settings.VIDEOS_DICT.keys())
 
@@ -271,7 +278,8 @@ def play_stored_video(conf,model):
 def detect(source, list_polygon, conf, model):
     vid_cap = cv2.VideoCapture(source)
     st_frame = st.empty()
-    
+    json_data = {}
+    btn = st.button("stop")
     # Get video info
     h, w = int(vid_cap.get(cv2.CAP_PROP_FRAME_HEIGHT)), int(vid_cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     
@@ -281,12 +289,46 @@ def detect(source, list_polygon, conf, model):
     
     while vid_cap.isOpened():
         success, image = vid_cap.read()
-        
+        #update interval
+        #car condition zone 
+       
         if success:
-                img_processed, json = count.process_frame(image, 0)
+                img_processed, jsons = count.process_frame(image, 0)
                 display_count(st_frame, img_processed)
-                text.json(json)
-    
+                text.json(jsons)
+                
+                # test_json = json(json)
+                # print(test_json)
+                # print(type(test_json))
+                # text.json(json)
         else:
             vid_cap.release()
             break
+        if btn:
+            st.write("stop")
+            json_data = json.loads(jsons)
+            break
+    if btn:
+        json_data = json.dumps(json_data)
+        response = requests.post(st.session_state['url'], data = json_data , headers = {'Content-Type': 'application/json'})
+        print(response) 
+        st.write(response.text)
+
+
+
+def interval_menu (typeCheck = None):
+    col1 , col2 , col3 = st.columns(3)
+    if typeCheck == 'image':
+        with col1:
+            st.write("input url to send detect data object")
+            st.session_state['url'] = st.text_input("url to send data:")
+    else:
+        with col1:
+            st.write("input url to send detect data object")
+            st.session_state['url'] = st.text_input("url to send data:")
+        with col2:
+            st.write("interval time to detect object")
+            st.session_state['interval'] = st.text_input("interval time:", value = 0)
+        with col3:
+            st.write("max car to detect object")
+            st.session_state['max_detect'] = st.text_input("max car", value = 0)

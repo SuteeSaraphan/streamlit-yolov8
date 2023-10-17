@@ -52,9 +52,10 @@ if 'web_frame' not in st.session_state:
 if 'rtsp_frame' not in st.session_state:
     st.session_state['rtsp_frame'] = 0
 
+if 'url' not in st.session_state:
+    st.session_state['url'] = ""
 if 'interval' not in st.session_state:
     st.session_state['interval'] = 1
-
 if 'mxa_detect' not in st.session_state:
     st.session_state['max_detect'] = 0
 
@@ -77,7 +78,9 @@ source_radio = st.sidebar.radio(
 
 source_img = None
 # If image is selected
+
 if source_radio == settings.IMAGE:
+    helper.interval_menu('image')
     source_img = st.sidebar.file_uploader(
         "Choose an image...", type=("jpg", "jpeg", "png", 'bmp', 'webp'))
     if source_img is not None:
@@ -86,6 +89,7 @@ if source_radio == settings.IMAGE:
     else:
         helper.test2 = {}
     col1, col2 = st.columns(2)
+    
    
     
     with col1:
@@ -109,6 +113,7 @@ if source_radio == settings.IMAGE:
                 default_detected_image_path)
             st.image(default_detected_image_path, caption='Detected Image',
                     use_column_width=True)
+            
         else:
             if st.sidebar.button('Detect Objects'):
                 res = model.predict(uploaded_image,
