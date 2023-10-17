@@ -318,19 +318,20 @@ def detect(source, list_polygon, conf, model):
         else:
             vid_cap.release()
             break
-
         #if somezone over max car
-        if st.session_state['max_detect'] != 0:
-            for i in range(0, len(count.object_counts)):
-                if count.object_counts[i] > st.session_state['max_detect']:
-                    btn = True
-                    break
-        #if interval time
-        if st.session_state['interval'] != 0:
-            if time.time() - start_time > st.session_state['interval']:
-                # btn = True
-                start_time = time.time()
-                print(f"Interval {st.session_state['interval']}")
+        # if st.session_state['max_detect'] != 0:
+        #     json_data = json.dumps(json_data)
+        #     for i in range(0, len(count.object_counts)):
+        #         if count.object_counts[i] > st.session_state['max_detect']:
+        #             response = requests.post(st.session_state['url'], data = json_data , headers = {'Content-Type': 'application/json'})
+        # #if interval time
+        # elif st.session_state['interval'] != 0:
+        #     json_data = json.dumps(json_data)
+        #     if time.time() - start_time > st.session_state['interval']:
+        #         # btn = True
+        #         start_time = time.time()
+        #         print(f"Interval {st.session_state['interval']}")
+        #         response = requests.post(st.session_state['url'], data = json_data , headers = {'Content-Type': 'application/json'})
         
 
 
