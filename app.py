@@ -82,7 +82,7 @@ source_img = None
 # If image is selected
 
 if source_radio == settings.IMAGE:
-    helper.interval_menu('image')
+    #helper.interval_menu('image')
     source_img = st.sidebar.file_uploader(
         "Choose an image...", type=("jpg", "jpeg", "png", 'bmp', 'webp'))
     if source_img is not None:
