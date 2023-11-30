@@ -22,13 +22,13 @@ result_polygon = []
 
 def polygon_draw(image, width = None, height = None , source = None):
     result_polygon = []
-   
-    if source == "image":
+    
+    if source == "image" and type(image) != str:
         scale_x = image.size[0] / 400
         scale_y = image.size[1] / 400
         bg_img = image
     elif source == "video":
-
+        
         # check frame video
         if st.session_state['sum_frame'] != image.get(cv2.CAP_PROP_FRAME_COUNT):
             st.session_state['sum_frame'] = image.get(cv2.CAP_PROP_FRAME_COUNT)
@@ -47,21 +47,26 @@ def polygon_draw(image, width = None, height = None , source = None):
         scale_x = frame.size[0] / 400
         scale_y = frame.size[1] / 400
     else:
-        return
+        return result_polygon
+  
 
     st.write("Draw a polygon on the image below (Left Click: To Draw a polygon, Right Click: To Enter Polygon):")
-    canvas_result = st_canvas(
-                fill_color='rgba(255, 165, 0, 0.3)',  # Fixed fill color with some opacity
-                stroke_width=1, # Stroke width
-                stroke_color='#ffffff',
-                background_image=bg_img,
-                height=400,
-                width=400,
-                drawing_mode='polygon', # Shape of brush
-                key='canvas',
-                display_toolbar=True,
-                update_streamlit=False if source == "video" else True,
-            )
+    try:
+        
+        canvas_result = st_canvas(
+                    fill_color='rgba(255, 165, 0, 0.3)',  # Fixed fill color with some opacity
+                    stroke_width=1, # Stroke width
+                    stroke_color='#ffffff',
+                    background_image=bg_img,
+                    height=400,
+                    width=400,
+                    drawing_mode='polygon', # Shape of brush
+                    key='canvas',
+                    display_toolbar=True,
+                    update_streamlit=False if source == "video" else True,
+                )
+    except Exception as e:
+        st.write("Error to draw polygon try again")
 
     # drawable canvas lib return polygon in json format
     if canvas_result.image_data is not None:
@@ -149,6 +154,7 @@ def play_youtube_video(conf, model):
             st.session_state['current_frame_youtube'] = 0
             st.session_state['frame'] = 0
             source_youtube = ""
+
     if source_youtube != "" and first_time  or btn_load or btn_next:
         try:
             yt = YouTube(source_youtube)
@@ -174,13 +180,14 @@ def play_youtube_video(conf, model):
             st.write(e)
        
     if st.sidebar.button('Detect Objects'):
-        try:
-            yt = YouTube(source_youtube)
-            stream = yt.streams.filter(file_extension="mp4", res=720).first()
-            detect(stream.url,result_polygon,conf,model)
+        print(source_youtube)
+        # try:
+        yt = YouTube(source_youtube)
+        stream = yt.streams.filter(file_extension="mp4", res=720).first()
+        detect(stream.url,result_polygon,conf,model)
 
-        except Exception as e:
-            st.sidebar.error("Error loading video: " + str(e))
+        # except Exception as e:
+        #     st.sidebar.error("Error loading video: " + str(e))
 
 
 def play_rtsp_stream(conf, model):
@@ -262,6 +269,7 @@ def play_stored_video(conf,model):
     if source_vid is not None:
         vid_cap = cv2.VideoCapture(str(settings.VIDEOS_DICT.get(source_vid)))
         result_polygon = polygon_draw(vid_cap, source = "video")
+        print(result_polygon)
     is_display_tracker, tracker = display_tracker_options()
 
     with open(settings.VIDEOS_DICT.get(source_vid), 'rb') as video_file:
@@ -317,26 +325,26 @@ def detect(source, list_polygon, conf, model):
             vid_cap.release()
             break
         # if somezone over max car
-        if st.session_state['max_detect'] != 0:
+        if st.session_state['max_detect'] != 0 and st.session_state['url'] != "":
             #send until over st.session_state['intervaldata']
             if any (count.object_counts[key] > st.session_state['max_detect'] for key in count.object_counts):
-                response = requests.post(st.session_state['url'], data = jsons , headers = {'Content-Type': 'application/json'})
+                post_api(jsons)
                 lastest_time = time.time()
             elif time.time() - lastest_time < st.session_state['intervaldata']:
-                response = requests.post(st.session_state['url'], data = jsons , headers = {'Content-Type': 'application/json'})
+                post_api(jsons)
 
 
         #if interval time
-        elif st.session_state['interval'] != 0 and time.time() - start_time > st.session_state['interval']:
+        elif st.session_state['interval'] != 0 and time.time() - start_time > st.session_state['interval'] :
                 start_time = time.time()
-                requests.post(st.session_state['url'], data = jsons , headers = {'Content-Type': 'application/json'})
+                post_api(jsons)
 
 
 
         if btn:
             st.write("stop")
     if btn:
-        response = requests.post(st.session_state['url'], data = jsons , headers = {'Content-Type': 'application/json'})
+        post_api(jsons)
         print(response) 
         st.write(response.text)
 
@@ -344,13 +352,14 @@ def detect(source, list_polygon, conf, model):
 
 def interval_menu (typeCheck = None):
     option = st.selectbox(
-    'Select mode',
-    ('interval', 'max_detect'))
+        'Select mode',
+        ('interval', 'max_detect'))
     col1 , col2 , col3 = st.columns(3)
     if typeCheck == 'image':
         with col1:
             st.write("input url to send detect data object")
             st.session_state['url'] = st.text_input("url to send data:")
+            option = None
     else:
         with col1:
             st.write("input url to send detect data object")
@@ -366,3 +375,13 @@ def interval_menu (typeCheck = None):
             with col3:
                 st.write("max car to detect object")
                 st.session_state['max_detect'] = st.number_input("max car", value = 0)
+
+def post_api (data):
+    if st.session_state['url'] != "":
+        try:
+            response = requests.post(st.session_state['url'], data = data , headers = {'Content-Type': 'application/json'})
+            print(response) 
+        except Exception as e:
+            pass
+          
+
