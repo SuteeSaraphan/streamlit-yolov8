@@ -1,153 +1,228 @@
-import argparse
-from collections import defaultdict, deque
+# Ultralytics YOLO 🚀, AGPL-3.0 license
+
+from collections import defaultdict
+from time import time
 
 import cv2
 import numpy as np
-from ultralytics import YOLO
 
-import supervision as sv
-
-
-class ViewTransformer:
-    def __init__(self, source: np.ndarray, target: np.ndarray) -> None:
-        source = source.astype(np.float32)
-        target = target.astype(np.float32)
-        self.m = cv2.getPerspectiveTransform(source, target)
-
-    def transform_points(self, points: np.ndarray) -> np.ndarray:
-        if points.size == 0:
-            return points
-
-        reshaped_points = points.reshape(-1, 1, 2).astype(np.float32)
-        transformed_points = cv2.perspectiveTransform(reshaped_points, self.m)
-        return transformed_points.reshape(-1, 2)
+from ultralytics.utils.checks import check_imshow
+from ultralytics.utils.plotting import Annotator, colors
 
 
-def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(
-        description="Vehicle Speed Estimation using Ultralytics and Supervision"
-    )
-    parser.add_argument(
-        "--source_video_path",
-        required=True,
-        help="Path to the source video file",
-        type=str,
-    )
-    parser.add_argument(
-        "--target_video_path",
-        required=True,
-        help="Path to the target video file (output)",
-        type=str,
-    )
-    parser.add_argument(
-        "--confidence_threshold",
-        default=0.3,
-        help="Confidence threshold for the model",
-        type=float,
-    )
-    parser.add_argument(
-        "--iou_threshold", default=0.7, help="IOU threshold for the model", type=float
-    )
+class SpeedEstimator:
+    """A class to estimation speed of objects in real-time video stream based on their tracks."""
 
-    return parser.parse_args()
+    def __init__(self):
+        """Initializes the speed-estimator class with default values for Visual, Image, track and speed parameters."""
+
+        # Visual & im0 information
+        self.im0 = None
+        self.annotator = None
+        self.view_img = False
+
+        # Region information
+        self.reg_pts = [(20, 400), (1260, 400)]
+        self.region_thickness = 3
+
+        # Predict/track information
+        self.clss = None
+        self.names = None
+        self.boxes = None
+        self.trk_ids = None
+        self.trk_pts = None
+        self.line_thickness = 2
+        self.trk_history = defaultdict(list)
+
+        # Speed estimator information
+        self.current_time = 0
+        self.dist_data = {}
+        self.trk_idslist = []
+        self.spdl_dist_thresh = 10
+        self.trk_previous_times = {}
+        self.trk_previous_points = {}
+
+        # Check if environment support imshow
+        self.env_check = check_imshow(warn=True)
+
+    def set_args(
+        self,
+        reg_pts,
+        names,
+        view_img=False,
+        line_thickness=2,
+        region_thickness=5,
+        spdl_dist_thresh=10,
+    ):
+        """
+        Configures the speed estimation and display parameters.
+
+        Args:
+            reg_pts (list): Initial list of points defining the speed calculation region.
+            names (dict): object detection classes names
+            view_img (bool): Flag indicating frame display
+            line_thickness (int): Line thickness for bounding boxes.
+            region_thickness (int): Speed estimation region thickness
+            spdl_dist_thresh (int): Euclidean distance threshold for speed line
+        """
+        if reg_pts is None:
+            print("Region points not provided, using default values")
+        else:
+            self.reg_pts = reg_pts
+        self.names = names
+        self.view_img = view_img
+        self.line_thickness = line_thickness
+        self.region_thickness = region_thickness
+        self.spdl_dist_thresh = spdl_dist_thresh
+
+    def extract_tracks(self, tracks):
+        """
+        Extracts results from the provided data.
+
+        Args:
+            tracks (list): List of tracks obtained from the object tracking process.
+        """
+        self.boxes = tracks[0].boxes.xyxy.cpu()
+        self.clss = tracks[0].boxes.cls.cpu().tolist()
+        self.trk_ids = tracks[0].boxes.id.int().cpu().tolist()
+
+    def store_track_info(self, track_id, box):
+        """
+        Store track data.
+
+        Args:
+            track_id (int): object track id.
+            box (list): object bounding box data
+        """
+        track = self.trk_history[track_id]
+        bbox_center = (float((box[0] + box[2]) / 2), float((box[1] + box[3]) / 2))
+        track.append(bbox_center)
+
+        if len(track) > 30:
+            track.pop(0)
+
+        self.trk_pts = np.hstack(track).astype(np.int32).reshape((-1, 1, 2))
+        return track
+
+    def plot_box_and_track(self, track_id, box, cls, track):
+        """
+        Plot track and bounding box.
+
+        Args:
+            track_id (int): object track id.
+            box (list): object bounding box data
+            cls (str): object class name
+            track (list): tracking history for tracks path drawing
+        """
+        speed_label = (
+            f"{int(self.dist_data[track_id])}km/ph"
+            if track_id in self.dist_data
+            else self.names[int(cls)]
+        )
+        bbox_color = (
+            colors(int(track_id)) if track_id in self.dist_data else (255, 0, 255)
+        )
+
+        self.annotator.box_label(box, speed_label, bbox_color)
+
+        cv2.polylines(
+            self.im0, [self.trk_pts], isClosed=False, color=(0, 255, 0), thickness=1
+        )
+        cv2.circle(self.im0, (int(track[-1][0]), int(track[-1][1])), 5, bbox_color, -1)
+
+    def calculate_speed(self, trk_id, track):
+        """
+        Calculation of object speed.
+
+        Args:
+            trk_id (int): object track id.
+            track (list): tracking history for tracks path drawing
+        """
+
+        if not self.reg_pts[0][0] < track[-1][0] < self.reg_pts[1][0]:
+            return
+        if (
+            self.reg_pts[1][1] - self.spdl_dist_thresh
+            < track[-1][1]
+            < self.reg_pts[1][1] + self.spdl_dist_thresh
+        ):
+            direction = "known"
+
+        elif (
+            self.reg_pts[0][1] - self.spdl_dist_thresh
+            < track[-1][1]
+            < self.reg_pts[0][1] + self.spdl_dist_thresh
+        ):
+            direction = "known"
+
+        else:
+            direction = "unknown"
+
+        if (
+            self.trk_previous_times[trk_id] != 0
+            and direction != "unknown"
+            and trk_id not in self.trk_idslist
+        ):
+            self.trk_idslist.append(trk_id)
+
+            time_difference = time() - self.trk_previous_times[trk_id]
+            if time_difference > 0:
+                dist_difference = np.abs(
+                    track[-1][1] - self.trk_previous_points[trk_id][1]
+                )
+                speed = dist_difference / time_difference
+                self.dist_data[trk_id] = speed
+
+        self.trk_previous_times[trk_id] = time()
+        self.trk_previous_points[trk_id] = track[-1]
+
+    def estimate_speed(self, im0, tracks, region_color=(255, 0, 0)):
+        """
+        Calculate object based on tracking data.
+
+        Args:
+            im0 (nd array): Image
+            tracks (list): List of tracks obtained from the object tracking process.
+            region_color (tuple): Color to use when drawing regions.
+        """
+        self.im0 = im0
+        if tracks[0].boxes.id is None:
+            if self.view_img and self.env_check:
+                self.display_frames()
+            return im0
+        self.extract_tracks(tracks)
+
+        self.annotator = Annotator(self.im0, line_width=2)
+        self.annotator.draw_region(
+            reg_pts=self.reg_pts, color=region_color, thickness=self.region_thickness
+        )
+
+        for box, trk_id, cls in zip(self.boxes, self.trk_ids, self.clss):
+            track = self.store_track_info(trk_id, box)
+
+            if trk_id not in self.trk_previous_times:
+                self.trk_previous_times[trk_id] = 0
+
+            self.plot_box_and_track(trk_id, box, cls, track)
+            self.calculate_speed(trk_id, track)
+
+        if self.view_img and self.env_check:
+            self.display_frames()
+
+        return im0
+
+    def display_frames(self):
+        """Display frame."""
+        cv2.imshow("Ultralytics Speed Estimation", self.im0)
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            return
+
+    def get_speed_data(self):
+        """
+        Returns a dictionary containing object IDs and their corresponding speeds.
+        """
+        return self.dist_data
 
 
 if __name__ == "__main__":
-    args = parse_arguments()
-
-    video_info = sv.VideoInfo.from_video_path(video_path=args.source_video_path)
-    model = YOLO("yolov8x.pt")
-
-    SOURCE = np.array(
-        [
-            [video_info.width, video_info.height],
-            [0, video_info.height],
-            [0, 0],
-            [video_info.width, 0],
-        ]
-    )
-
-    TARGET = np.array(
-        [
-            [0, 0],
-            [video_info.width - 1, 0],
-            [video_info.width - 1, video_info.height - 1],
-            [0, video_info.height - 1],
-        ]
-    )
-
-    view_transformer = ViewTransformer(source=SOURCE, target=TARGET)
-
-    byte_track = sv.ByteTrack(
-        frame_rate=video_info.fps, track_thresh=args.confidence_threshold
-    )
-
-    thickness = sv.calculate_dynamic_line_thickness(
-        resolution_wh=video_info.resolution_wh
-    )
-    text_scale = sv.calculate_dynamic_text_scale(resolution_wh=video_info.resolution_wh)
-    bounding_box_annotator = sv.BoundingBoxAnnotator(thickness=thickness)
-    label_annotator = sv.LabelAnnotator(
-        text_scale=text_scale,
-        text_thickness=thickness,
-        text_position=sv.Position.BOTTOM_CENTER,
-    )
-    trace_annotator = sv.TraceAnnotator(
-        thickness=thickness,
-        trace_length=video_info.fps * 2,
-        position=sv.Position.BOTTOM_CENTER,
-    )
-
-    frame_generator = sv.get_video_frames_generator(source_path=args.source_video_path)
-
-    polygon_zone = sv.PolygonZone(
-        polygon=SOURCE, frame_resolution_wh=video_info.resolution_wh
-    )
-
-    coordinates = defaultdict(lambda: deque(maxlen=video_info.fps))
-
-    with sv.VideoSink(args.target_video_path, video_info) as sink:
-        for frame in frame_generator:
-            result = model(frame)[0]
-            detections = sv.Detections.from_ultralytics(result)
-            detections = detections[detections.confidence > args.confidence_threshold]
-            detections = detections[polygon_zone.trigger(detections)]
-            detections = detections.with_nms(threshold=args.iou_threshold)
-            detections = byte_track.update_with_detections(detections=detections)
-
-            points = detections.get_anchors_coordinates(
-                anchor=sv.Position.BOTTOM_CENTER
-            )
-            points = view_transformer.transform_points(points=points).astype(int)
-
-            for tracker_id, [_, y] in zip(detections.tracker_id, points):
-                coordinates[tracker_id].append(y)
-
-            labels = []
-            for tracker_id in detections.tracker_id:
-                if len(coordinates[tracker_id]) < video_info.fps / 2:
-                    labels.append(f"#{tracker_id}")
-                else:
-                    coordinate_start = coordinates[tracker_id][-1]
-                    coordinate_end = coordinates[tracker_id][0]
-                    distance = abs(coordinate_start - coordinate_end)
-                    time = len(coordinates[tracker_id]) / video_info.fps
-                    speed = distance / time * 3.6
-                    labels.append(f"#{tracker_id} {int(speed)} km/h")
-
-            annotated_frame = frame.copy()
-            annotated_frame = trace_annotator.annotate(
-                scene=annotated_frame, detections=detections
-            )
-            annotated_frame = bounding_box_annotator.annotate(
-                scene=annotated_frame, detections=detections
-            )
-            annotated_frame = label_annotator.annotate(
-                scene=annotated_frame, detections=detections, labels=labels
-            )
-
-            sink.write_frame(annotated_frame)
-            cv2.imshow("frame", annotated_frame)
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
-        cv2.destroyAllWindows()
+    SpeedEstimator()
