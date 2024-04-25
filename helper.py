@@ -15,6 +15,7 @@ import settings
 from streamlit_drawable_canvas import st_canvas
 import speed_check
 import base64
+import datetime
 
 
 result_polygon = []
@@ -384,23 +385,39 @@ def detect_speed(source, list_line, conf, model):
     btn = st.button("stop")
     # Get video info
     speed_obj = speed_check.SpeedEstimator()
-    speed_obj.set_args(reg_pts=line_pts, names=model.model.names)
+    speed_obj.set_args(reg_pts=line_pts, names=model.model.names, view_img=True)
     desired_frame_rate = vid_cap.get(cv2.CAP_PROP_FPS)
+    print(f"Desired frame rate: {desired_frame_rate}")
     frame_time = 1.0 / desired_frame_rate
+    print(f"Frame time: {frame_time}")
+    print(frame_time * desired_frame_rate)
     frames_processed = 0
     frames_to_skip = 0
+    prev_Frame = 0
     while vid_cap.isOpened():
         success, image = vid_cap.read()
-
         if success:
             # Process and display every nth frame, where n is frames_to_skip + 1
             if frames_processed % (frames_to_skip + 1) == 0:
+                current_Frame = vid_cap.get(cv2.CAP_PROP_POS_FRAMES)
+                frame_diff = int(current_Frame - prev_Frame)
                 process_start_time = time.time()
-                tracks = model.track(image, persist=True, show=False)
-
-                image = speed_obj.estimate_speed(image, tracks)
+                tracks = model.track(
+                    image,
+                    persist=True,
+                    imgsz=(h, w),
+                    classes=[2, 5, 7],
+                    vid_stride=frame_diff,
+                )
+                time_to_skip = frame_diff * frame_time
+                image = speed_obj.estimate_speed(image, tracks, time_to_skip)
                 display_count(st_frame, image)
-                print(speed_obj.get_speed_data())
+
+                dict_data = speed_obj.get_speed_data()
+                # print all keys and values
+                for key, value in dict_data.items():
+                    print(f"Key: {key}, Value: {value}")
+
                 process_end_time = time.time()
                 processing_time = process_end_time - process_start_time
                 frames_to_skip = max(
@@ -410,6 +427,7 @@ def detect_speed(source, list_line, conf, model):
                     f"Processing time: {processing_time}, Frames to skip: {frames_to_skip}"
                 )
                 frames_processed = 0
+                prev_Frame = current_Frame
 
             frames_processed += 1
         else:
@@ -469,3 +487,61 @@ def post_api(data):
             print(response)
         except Exception as e:
             pass
+
+
+def create_dict(
+    ip_camera,
+    length,
+    speed,
+    imgbase64,
+    license_province=None,
+    license_front=None,
+    license_back=None,
+):
+    """
+    Create a dictionary containing information about a vehicle.
+
+    Parameters:
+        ip_camera (str): The IP address of the camera capturing the vehicle.
+        length (float): The length of the vehicle.
+        speed (float): The speed of the vehicle.
+        imgbase64 (str): The base64 encoded image of the vehicle.
+        license_province (str, optional): The province of the vehicle's license plate.
+        license_front (str, optional): The front image of the vehicle's license plate.
+        license_back (str, optional): The back image of the vehicle's license plate.
+
+    Returns:
+        dict: A dictionary containing the vehicle information.
+    """
+    # Type checking
+    if not isinstance(ip_camera, str):
+        raise TypeError("ip_camera must be a string")
+    if not isinstance(length, float):
+        raise TypeError("length must be a float")
+    if not isinstance(speed, float):
+        raise TypeError("speed must be a float")
+    if not isinstance(imgbase64, str):
+        raise TypeError("imgbase64 must be a string")
+    if license_province is not None and not isinstance(license_province, str):
+        raise TypeError("license_province must be a string or None")
+    if license_front is not None and not isinstance(license_front, str):
+        raise TypeError("license_front must be a string or None")
+    if license_back is not None and not isinstance(license_back, str):
+        raise TypeError("license_back must be a string or None")
+
+    # Create the dictionary
+    vehicle_dict = {}
+    vehicle_dict["cameraIp"] = ip_camera
+    vehicle_dict["trxDatetime"] = str(datetime.datetime.now())
+    vehicle_dict["vehicleLength"] = length
+    vehicle_dict["vehicleSpeed"] = speed
+    vehicle_dict["licencePlateProvince"] = license_province
+    vehicle_dict["licencePlateFront"] = license_front
+    vehicle_dict["licencePlateBack"] = license_back
+    vehicle_dict["vehicleImage"] = imgbase64
+    return vehicle_dict
+
+
+if __name__ == "__main__":
+    model = load_model("yolov8s.pt")
+    detect_speed("videos/video1.mp4", [[0, 360], [1920, 360]], 0.5, model)

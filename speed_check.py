@@ -37,6 +37,7 @@ class SpeedEstimator:
         # Speed estimator information
         self.current_time = 0
         self.dist_data = {}
+        self.size_data = {}
         self.trk_idslist = []
         self.spdl_dist_thresh = 10
         self.trk_previous_times = {}
@@ -122,7 +123,8 @@ class SpeedEstimator:
         bbox_color = (
             colors(int(track_id)) if track_id in self.dist_data else (255, 0, 255)
         )
-
+        # self.size_data[track_id] will be return top left and bottom right points of the bounding box
+        self.size_data[track_id] = (int(box[0]), int(box[1]), int(box[2]), int(box[3]))
         self.annotator.box_label(box, speed_label, bbox_color)
 
         cv2.polylines(
@@ -130,7 +132,7 @@ class SpeedEstimator:
         )
         cv2.circle(self.im0, (int(track[-1][0]), int(track[-1][1])), 5, bbox_color, -1)
 
-    def calculate_speed(self, trk_id, track):
+    def calculate_speed(self, trk_id, track, time_to_skip):
         """
         Calculation of object speed.
 
@@ -165,7 +167,8 @@ class SpeedEstimator:
         ):
             self.trk_idslist.append(trk_id)
 
-            time_difference = time() - self.trk_previous_times[trk_id]
+            time_difference = time() - self.trk_previous_times[trk_id] + time_to_skip
+            print(f"Time difference: {time_difference}")
             if time_difference > 0:
                 dist_difference = np.abs(
                     track[-1][1] - self.trk_previous_points[trk_id][1]
@@ -176,7 +179,7 @@ class SpeedEstimator:
         self.trk_previous_times[trk_id] = time()
         self.trk_previous_points[trk_id] = track[-1]
 
-    def estimate_speed(self, im0, tracks, region_color=(255, 0, 0)):
+    def estimate_speed(self, im0, tracks, time_to_skip=0, region_color=(255, 0, 0)):
         """
         Calculate object based on tracking data.
 
@@ -192,19 +195,24 @@ class SpeedEstimator:
             return im0
         self.extract_tracks(tracks)
 
-        self.annotator = Annotator(self.im0, line_width=2)
-        self.annotator.draw_region(
-            reg_pts=self.reg_pts, color=region_color, thickness=self.region_thickness
-        )
+        # self.annotator = Annotator(self.im0, line_width=2)
+        # self.annotator.draw_region(
+        #     reg_pts=self.reg_pts, color=region_color, thickness=self.region_thickness
+        # )
 
         for box, trk_id, cls in zip(self.boxes, self.trk_ids, self.clss):
+
             track = self.store_track_info(trk_id, box)
 
             if trk_id not in self.trk_previous_times:
                 self.trk_previous_times[trk_id] = 0
-
-            self.plot_box_and_track(trk_id, box, cls, track)
-            self.calculate_speed(trk_id, track)
+            self.size_data[trk_id] = (
+                int(box[0]),
+                int(box[1]),
+                int(box[2]),
+                int(box[3]),
+            )
+            self.calculate_speed(trk_id, track, time_to_skip)
 
         if self.view_img and self.env_check:
             self.display_frames()
@@ -219,9 +227,34 @@ class SpeedEstimator:
 
     def get_speed_data(self):
         """
-        Returns a dictionary containing object IDs and their corresponding speeds.
+        Returns a dictionary containing object IDs, their corresponding speeds, and box sizes.
+
+        Returns:
+            dict_data: Dictionary containing object IDs, their corresponding speeds and box sizes.
         """
-        return self.dist_data
+        # merge dist_data and size_data with trk_ids
+        dict_data = {
+            k: [self.dist_data[k], self.size_data[k]] for k in self.trk_idslist
+        }
+        return dict_data
+
+    def clear_dict_data(self, id):
+        """
+        Clear dist_data and size_data for a given track id.
+
+        Args:
+            id (int): object track id.
+        """
+        # print(f"Clearing data for track id: {id}")
+        if id in self.dist_data:
+            del self.dist_data[id]
+            # print(f"Deleted dist_data for track id: {id}")
+        if id in self.size_data:
+            del self.size_data[id]
+            # print(f"Deleted size_data for track id: {id}")
+        if id in self.trk_idslist:
+            self.trk_idslist.remove(id)
+            # print(f"Deleted track id: {id}")
 
 
 if __name__ == "__main__":
