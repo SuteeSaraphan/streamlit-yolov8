@@ -212,6 +212,7 @@ class SpeedEstimator:
                 int(box[2]),
                 int(box[3]),
             )
+            # self.plot_box_and_track(trk_id, box, cls, track)
             self.calculate_speed(trk_id, track, time_to_skip)
 
         if self.view_img and self.env_check:

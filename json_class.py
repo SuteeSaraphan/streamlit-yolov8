@@ -18,6 +18,9 @@ class IPCameraDatabase:
     def save_data(self):
         with open(self.filename, "w") as file:
             json.dump(self.data, file, indent=4)
+        print("Saved")
+        self.display_data()
+        self.data = self.load_data()
 
     def add_ip_camera(self, ip_camera, lines, overwrite=False):
         if ip_camera in self.data and not overwrite:
@@ -59,6 +62,12 @@ if __name__ == "__main__":
     ip_camera_db = IPCameraDatabase(filename)
     ip_camera_db.display_data()
 
+    # Get 3.3.3.3
+    print("Get 1.1.1.1")
+    print(ip_camera_db.get_data_by_ip_camera("1.1.1.1"))
+    print("Get 3.3.3.3")
+    print(ip_camera_db.get_data_by_ip_camera("3.3.3.3"))
+
     # Add new ip_camera and lines without overwriting
     ip_camera_db.add_ip_camera("3.3.3.3", [[0, 360], [1920, 360]])
     ip_camera_db.display_data()
@@ -72,7 +81,7 @@ if __name__ == "__main__":
     ip_camera_db.display_data()
 
     # Edit existing ip_camera to new lines
-    if ip_camera_db.edit_ip_camera("1.1.1.1", [[0, 200], [1920, 200]]):
+    if ip_camera_db.edit_ip_camera("1.1.1.1", [[0, 300], [640, 300]]):
         print("Edit successful.")
     else:
         print("Edit failed. IP camera not found.")
