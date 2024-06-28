@@ -69,8 +69,6 @@ def line_draw(image, width=None, height=None, source=None):
     except Exception as e:
         st.write("Error to draw line try again")
 
-    # print(canvas_result.json_data)
-    # drawable canvas lib return polygon in json format
     if canvas_result.image_data is not None:
         df = pd.json_normalize(canvas_result.json_data["objects"])
         left = df.loc[0, "left"]
@@ -112,8 +110,10 @@ def play_speed_estimation(conf, model):
     # source_rtsp = st.sidebar.text_input("rtsp stream url:")
     source_rtsp = get_ip_camera()
     result_line = IPcamera_obj.get_data_by_ip_camera(source_rtsp)
-    ratio_adjust = st.slider("Ratio to adjust speed size", 0.0, 2.0, 1.0)
-    st.write(f"ratio adjust: {ratio_adjust}")
+    speed_adjust = st.slider("Ratio to adjust speed size", 0.0, 2.0, 1.0)
+    ratio_adjust = st.slider("Ratio to adjust length size", 0.0, 2.0, 1.0)
+
+    st.write(f"Speed adjust: {speed_adjust}, Length adjust: {ratio_adjust}")
     if result_line == None:
         st.write("Please draw line to detect car speed")
         st.session_state["drawline"] = True
@@ -166,6 +166,7 @@ def play_speed_estimation(conf, model):
                 conf,
                 model,
                 source_rtsp,
+                speed_adjust,
                 ratio_adjust,
                 speed_mode,
                 display_mode,
@@ -180,6 +181,7 @@ def detect_speed(
     conf,
     model,
     source_rtsp=None,
+    speed_adjust=1.0,
     ratio_adjust=1.0,
     speed_mode=False,
     display_mode=False,
@@ -219,7 +221,7 @@ def detect_speed(
                 tracks = model.track(
                     image,
                     persist=True,
-                    imgsz=(h / 2, w / 2),
+                    imgsz=(h / 8, w / 8),
                     classes=[2, 5, 7],
                     vid_stride=frame_diff,
                     conf=conf,
@@ -227,12 +229,19 @@ def detect_speed(
 
                 time_to_skip = frame_diff * frame_time
                 image_speed = speed_obj.estimate_speed(image, tracks, time_to_skip)
-                display_count(st_frame, image_speed)
+                if display_mode:
+                    display_count(st_frame, image_speed)
 
                 dict_data = process_speed_data(
-                    speed_obj, list_check, image, source_rtsp, ratio_adjust
+                    speed_obj,
+                    list_check,
+                    image,
+                    source_rtsp,
+                    ratio_adjust,
+                    speed_adjust,
                 )
                 if dict_data:
+                    print(dict_data)
                     post_api(json.dumps(dict_data))
                 processing_time = time.time() - process_start_time
                 frames_to_skip = max(
@@ -248,18 +257,20 @@ def detect_speed(
             tracks = model.track(
                 image,
                 persist=True,
-                imgsz=(h / 2, w / 2),
+                imgsz=(h / 8, w / 8),
                 classes=[2, 5, 7],
                 conf=conf,
             )
 
             image_speed = speed_obj.estimate_speed(image, tracks)
-            display_count(st_frame, image_speed)
+            if display_mode:
+                display_count(st_frame, image_speed)
 
             dict_data = process_speed_data(
-                speed_obj, list_check, image, source_rtsp, ratio_adjust
+                speed_obj, list_check, image, source_rtsp, ratio_adjust, speed_adjust
             )
             if dict_data:
+                print(dict_data)
                 post_api(json.dumps(dict_data))
 
         if btn:
@@ -269,7 +280,9 @@ def detect_speed(
     vid_cap.release()
 
 
-def process_speed_data(speed_obj, list_check, image, source_rtsp, raito_adjust=1.0):
+def process_speed_data(
+    speed_obj, list_check, image, source_rtsp, raito_adjust=1.0, speed_adjust=1.0
+):
     dict_data = speed_obj.get_speed_data()
     if dict_data == {}:
         return None
@@ -305,7 +318,7 @@ def process_speed_data(speed_obj, list_check, image, source_rtsp, raito_adjust=1
         imgbase64_full = convert_to_base64(image)
         imgbase64_crop = convert_to_base64(crop_img)
         length = float(x2 - x1) * raito_adjust
-        speed = value[0] * raito_adjust
+        speed = value[0] * speed_adjust
         vehicle_dict = create_dict(
             urlparse(source_rtsp).netloc,
             key,
