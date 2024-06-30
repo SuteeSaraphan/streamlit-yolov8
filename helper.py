@@ -110,10 +110,13 @@ def play_speed_estimation(conf, model):
     # source_rtsp = st.sidebar.text_input("rtsp stream url:")
     source_rtsp = get_ip_camera()
     result_line = IPcamera_obj.get_data_by_ip_camera(source_rtsp)
-    speed_adjust = st.slider("Ratio to adjust speed size", 0.0, 2.0, 1.0)
-    ratio_adjust = st.slider("Ratio to adjust length size", 0.0, 2.0, 1.0)
+    speed_adjust = st.slider("Ratio to adjust speed size", 0.0, 3.0, 1.0)
+    ratio_adjust = st.slider("Ratio to adjust length size", 0.0, 3.0, 1.0)
+    divide_size = st.radio("Divide size", [1, 2, 4, 8], horizontal=True)
 
-    st.write(f"Speed adjust: {speed_adjust}, Length adjust: {ratio_adjust}")
+    st.write(
+        f"Speed adjust: {speed_adjust}, Length adjust: {ratio_adjust}, Divide size: {divide_size}"
+    )
     if result_line == None:
         st.write("Please draw line to detect car speed")
         st.session_state["drawline"] = True
@@ -168,6 +171,7 @@ def play_speed_estimation(conf, model):
                 source_rtsp,
                 speed_adjust,
                 ratio_adjust,
+                divide_size,
                 speed_mode,
                 display_mode,
             )
@@ -183,6 +187,7 @@ def detect_speed(
     source_rtsp=None,
     speed_adjust=1.0,
     ratio_adjust=1.0,
+    divide_size=4,
     speed_mode=False,
     display_mode=False,
 ):
@@ -212,21 +217,29 @@ def detect_speed(
         if not success:
             break
 
+        tracks = model.track(
+            image,
+            persist=True,
+            imgsz=(h / divide_size, w / divide_size),
+            classes=[2, 5, 7],
+            conf=conf,
+        )
+
+        # Check if any object is detected
+        if not tracks or tracks[0].boxes.id is None:
+            # Skip 1 second worth of frames
+            vid_cap.set(
+                cv2.CAP_PROP_POS_FRAMES, vid_cap.get(cv2.CAP_PROP_POS_FRAMES) + fps
+            )
+            continue  # Skip to the next loop iteration
+
         if speed_mode:
             if frames_processed % (frames_to_skip + 1) == 0:
                 current_Frame = vid_cap.get(cv2.CAP_PROP_POS_FRAMES)
                 frame_diff = int(current_Frame - prev_Frame)
                 process_start_time = time.time()
 
-                tracks = model.track(
-                    image,
-                    persist=True,
-                    imgsz=(h / 8, w / 8),
-                    classes=[2, 5, 7],
-                    vid_stride=frame_diff,
-                    conf=conf,
-                )
-
+                # Processing tracks for speed estimation
                 time_to_skip = frame_diff * frame_time
                 image_speed = speed_obj.estimate_speed(image, tracks, time_to_skip)
                 if display_mode:
@@ -243,6 +256,7 @@ def detect_speed(
                 if dict_data:
                     print(dict_data)
                     post_api(json.dumps(dict_data))
+
                 processing_time = time.time() - process_start_time
                 frames_to_skip = max(
                     0, math.floor((processing_time - frame_time) / frame_time)
@@ -254,14 +268,6 @@ def detect_speed(
             frames_processed += 1
 
         else:
-            tracks = model.track(
-                image,
-                persist=True,
-                imgsz=(h / 8, w / 8),
-                classes=[2, 5, 7],
-                conf=conf,
-            )
-
             image_speed = speed_obj.estimate_speed(image, tracks)
             if display_mode:
                 display_count(st_frame, image_speed)
@@ -269,6 +275,7 @@ def detect_speed(
             dict_data = process_speed_data(
                 speed_obj, list_check, image, source_rtsp, ratio_adjust, speed_adjust
             )
+
             if dict_data:
                 print(dict_data)
                 post_api(json.dumps(dict_data))
