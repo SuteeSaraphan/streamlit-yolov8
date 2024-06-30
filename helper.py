@@ -229,7 +229,8 @@ def detect_speed(
         if not tracks or tracks[0].boxes.id is None:
             # Skip 1 second worth of frames
             vid_cap.set(
-                cv2.CAP_PROP_POS_FRAMES, vid_cap.get(cv2.CAP_PROP_POS_FRAMES) + fps
+                cv2.CAP_PROP_POS_FRAMES,
+                vid_cap.get(cv2.CAP_PROP_POS_FRAMES) + int(fps / 5),
             )
             continue  # Skip to the next loop iteration
 
