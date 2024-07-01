@@ -230,7 +230,7 @@ def detect_speed(
             # Skip 1 second worth of frames
             vid_cap.set(
                 cv2.CAP_PROP_POS_FRAMES,
-                vid_cap.get(cv2.CAP_PROP_POS_FRAMES) + int(fps / 5),
+                vid_cap.get(cv2.CAP_PROP_POS_FRAMES) + int(fps / divide_size),
             )
             continue  # Skip to the next loop iteration
 
