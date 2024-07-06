@@ -238,7 +238,7 @@ def detect_speed(
             if frames_processed % (frames_to_skip + 1) == 0:
                 current_Frame = vid_cap.get(cv2.CAP_PROP_POS_FRAMES)
                 frame_diff = int(current_Frame - prev_Frame)
-                process_start_time = time.time()
+                process_start_time = time.time
 
                 # Processing tracks for speed estimation
                 time_to_skip = frame_diff * frame_time
