@@ -225,12 +225,15 @@ def detect_speed(
             conf=conf,
         )
 
+        if display_mode:
+            display_count(st_frame, image)
+
         # Check if any object is detected
         if not tracks or tracks[0].boxes.id is None:
-            # Skip 1 second worth of frames
+            print("No object detected")
             vid_cap.set(
                 cv2.CAP_PROP_POS_FRAMES,
-                vid_cap.get(cv2.CAP_PROP_POS_FRAMES) + int(fps / divide_size),
+                vid_cap.get(cv2.CAP_PROP_POS_FRAMES) + int(fps / (divide_size * 5)),
             )
             continue  # Skip to the next loop iteration
 
@@ -243,8 +246,8 @@ def detect_speed(
                 # Processing tracks for speed estimation
                 time_to_skip = frame_diff * frame_time
                 image_speed = speed_obj.estimate_speed(image, tracks, time_to_skip)
-                if display_mode:
-                    display_count(st_frame, image_speed)
+                # if display_mode:
+                #     display_count(st_frame, image_speed)
 
                 dict_data = process_speed_data(
                     speed_obj,
@@ -270,8 +273,8 @@ def detect_speed(
 
         else:
             image_speed = speed_obj.estimate_speed(image, tracks)
-            if display_mode:
-                display_count(st_frame, image_speed)
+            # if display_mode:
+            #     display_count(st_frame, image_speed)
 
             dict_data = process_speed_data(
                 speed_obj, list_check, image, source_rtsp, ratio_adjust, speed_adjust
@@ -357,8 +360,10 @@ def get_ip_camera():
             submit_button = st.form_submit_button("Submit URL")
     with col2:
         with st.form("my-RTSP"):
-            st.write("Example URL: rtsp://localhost:8554/")
-            ip_rtsp = st.text_input("Input IP RTSP :")
+            st.write("Example URL: rtsp://172.25.48.94:554/axis-media/media.amp")
+            ip_rtsp = st.text_input(
+                "Input IP RTSP :", value="rtsp://172.25.48.94:554/axis-media/media.amp"
+            )
             submit_button = st.form_submit_button("Submit IP RTSP")
     return ip_rtsp
 
